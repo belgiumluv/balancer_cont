@@ -8,7 +8,7 @@ services:
       - "9090:9090"
     environment:
       - EMAIL=zastawa777@gmail.com
-      - DUCKDNS_TOKEN=660b72b3-dcda-41ec-908a-d4a0e7d0e02a
+      - DESEC_TOKEN=8GM6miDQkSC5TpsuFv8yXjVWd221
       - RENEW_INTERVAL=21600
       - RENEW_BEFORE_DAYS=30
       - DOMAIN_DIR=/server_data
