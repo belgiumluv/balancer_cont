@@ -1,12 +1,16 @@
-version: "3.9"
-
 services:
-  redis:
+  app:
     build: .
-    container_name: redis-from-source
-    restart: always        # автозапуск и перезапуск, если упал
+    container_name: redis-prometheus
+    restart: always
     ports:
       - "6379:6379"
-    # Если нужен внешний volume для данных:
-    # volumes:
-    #   - ./data:/data
+      - "9090:9090"
+    environment:
+      - EMAIL=zastawa777@gmail.com
+      - DUCKDNS_TOKEN=660b72b3-dcda-41ec-908a-d4a0e7d0e02a
+    volumes:
+      - ./server_data:/server_data
+      - ./lego:/data/lego
+      - ./ssl:/opt/ssl
+      - ./configs:/configs   # <- конфиг Prometheus с хоста в /configs

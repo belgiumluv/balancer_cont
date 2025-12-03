@@ -8,7 +8,7 @@ from pathlib import Path
 import requests
 
 # ---------- пути (можно переопределить через ENV) ----------
-DOMAIN_DIR     = Path(os.getenv("DOMAIN_DIR", "/server_data"))
+DOMAIN_DIR = Path(os.getenv("DOMAIN_DIR", "/server_data"))
 DOMAIN_TXT = DOMAIN_DIR / "domain.txt"
 
 
@@ -20,9 +20,9 @@ def get_public_ip(timeout=5) -> str:
     return resp.text.strip()
 
 
-
 def main():
-    domain = "test.example.com"
+    domain = "test-node-get-cert.dedyn.io"
+    DOMAIN_DIR.mkdir(parents=True, exist_ok=True)
     with open(DOMAIN_TXT, "w", encoding="utf-8") as f:
         f.write(domain)
 
