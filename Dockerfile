@@ -1,92 +1,108 @@
-# ===== СЛОЙ 1: сборка Redis из исходников =====
-FROM alpine:3.19 AS builder
+# =========================
+# СЛОЙ 1: сборка Redis из исходников
+# =========================
+FROM ubuntu:22.04 AS builder
 
-RUN apk update && apk add --no-cache \
-    build-base \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
     git \
-    linux-headers \
-    jemalloc-dev \
+    libjemalloc-dev \
+    curl \
+    ca-certificates \
     tar \
-    bash
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-
-ARG LEGO_VERSION=4.23.2
-RUN curl -L "https://github.com/go-acme/lego/releases/download/v${LEGO_VERSION}/lego_v${LEGO_VERSION}_linux_amd64.tar.gz" \
-    | tar -xz -C /usr/local/bin lego
 # Клонируем официальный Redis
 RUN git clone https://github.com/redis/redis.git
 WORKDIR /build/redis
 
-# При желании можно зафиксировать версию, например:
+# При желании можно зафиксироваться на версии:
 # RUN git checkout 7.4.0
 
-RUN make -j$(nproc)
+# Собираем Redis
+RUN make -j"$(nproc)"
 
 
-# ===== СЛОЙ 2: финальный образ =====
-FROM alpine:3.19
+# =========================
+# СЛОЙ 2: финальный образ
+# =========================
+FROM ubuntu:22.04
 
-# Runtime-зависимости + Python и requests
-RUN apk add --no-cache \
-    jemalloc \
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Runtime-зависимости: Redis, Python, requests, curl, tar, Prometheus, lego
+RUN apt-get update && apt-get install -y \
+    libjemalloc2 \
     bash \
     python3 \
-    py3-requests
+    python3-venv \
+    python3-requests \
+    curl \
+    ca-certificates \
+    tar \
+    gzip \
+ && rm -rf /var/lib/apt/lists/*
 
-# Папка Redis
+
+# ----- Установка lego (ACME клиент) -----
+ARG LEGO_VERSION=4.23.2
+RUN curl -L -o /tmp/lego.tar.gz "https://github.com/go-acme/lego/releases/download/v${LEGO_VERSION}/lego_v${LEGO_VERSION}_linux_amd64.tar.gz" \
+ && tar -xzf /tmp/lego.tar.gz -C /usr/local/bin lego \
+ && rm -f /tmp/lego.tar.gz
+
+
+# ----- Установка Prometheus -----
+ARG PROMETHEUS_VERSION=2.51.1
+RUN curl -L -o /tmp/prometheus.tar.gz "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" \
+ && tar -xzf /tmp/prometheus.tar.gz -C /tmp \
+ && mv /tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64/prometheus /usr/local/bin/prometheus \
+ && rm -rf /tmp/prometheus.tar.gz /tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64
+
+
+# ----- Каталоги под данные и конфиги -----
+RUN mkdir -p \
+    /Redis \
+    /server_data \
+    /data/lego \
+    /opt/ssl \
+    /etc/prometheus/data \
+    /configs
+
+
+# ----- Redis -----
 WORKDIR /Redis
 
-# Бинарники Redis
+# Бинарники Redis из builder-слоя
 COPY --from=builder /build/redis/src/redis-server /Redis/redis-server
 COPY --from=builder /build/redis/src/redis-cli    /Redis/redis-cli
 
-# Конфиг Redis (внешний файл из проекта)
+# Внешний конфиг Redis (лежит рядом с Dockerfile)
 COPY redis.conf /Redis/redis.conf
 
-# Скрипт generate_domain
+
+# ----- Скрипты и конфиги -----
+# Python-скрипты (generate_domain.py и др.)
 COPY scripts /scripts
+
+# Конфиги Prometheus — на хосте: ./configs/prometheus.yml
+COPY configs /configs
 
 # entrypoint
 COPY entrypoint.sh /entrypoint.sh
-
-# Права
 RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh
 
-# ENV для скрипта
+
+# ----- ENV -----
 ENV DOMAIN_DIR=/server_data
 
-# На всякий случай создадим директорию
-RUN mkdir -p /server_data
 
-ARG PROMETHEUS_VERSION=2.51.1
-
-RUN cd /tmp && \
-    wget https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz && \
-    tar xvf prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz && \
-    mv prometheus-${PROMETHEUS_VERSION}.linux-amd64/prometheus /usr/local/bin/prometheus && \
-    rm -rf /tmp/prometheus*
-
-# Папка для конфигов Prometheus внутри контейнера
-RUN mkdir -p /configs /etc/prometheus/data
-
-# Кладём наш конфиг в /configs
-COPY configs /configs
-
-# --- Redis, скрипты, entrypoint как раньше ---
-WORKDIR /Redis
-COPY --from=builder /build/redis/src/redis-server /Redis/redis-server
-COPY --from=builder /build/redis/src/redis-cli    /Redis/redis-cli
-COPY redis.conf /Redis/redis.conf
-COPY scripts /scripts
-COPY entrypoint.sh /entrypoint.sh
-
-RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh
-
-ENV DOMAIN_DIR=/server_data
-RUN mkdir -p /server_data
-
+# ----- Порты -----
 EXPOSE 6379 9090
 
+
+# ----- Старт -----
 CMD ["/entrypoint.sh"]
