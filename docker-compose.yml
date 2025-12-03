@@ -9,8 +9,14 @@ services:
     environment:
       - EMAIL=zastawa777@gmail.com
       - DUCKDNS_TOKEN=660b72b3-dcda-41ec-908a-d4a0e7d0e02a
+      - RENEW_INTERVAL=21600
+      - RENEW_BEFORE_DAYS=30
+      - DOMAIN_DIR=/server_data
     volumes:
       - ./server_data:/server_data
       - ./lego:/data/lego
       - ./ssl:/opt/ssl
       - ./configs:/configs   # <- конфиг Prometheus с хоста в /configs
+    ports:
+      - "6379:6379"
+      - "9090:9090"
