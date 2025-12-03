@@ -6,13 +6,14 @@ log() {
 }
 
 # ---------- 1) Генерация domain.txt ----------
-log "[entrypoint] Running generate_domain.py..."
+log "Running generate_domain.py..."
 python3 /scripts/generate_domain.py
 
-log "[entrypoint] DOMAIN_DIR=${DOMAIN_DIR:-/server_data}"
-log "[entrypoint] Domain file should be at ${DOMAIN_DIR:-/server_data}/domain.txt"
+DOMAIN_TXT_PATH="${DOMAIN_DIR:-/server_data}/domain.txt"
+log "Domain file expected at: ${DOMAIN_TXT_PATH}"
 
 # ---------- 2) TLS stage (deSEC + lego) ----------
+log "TLS stage (deSEC) after setconfiguration..."
 
 : "${EMAIL:?EMAIL env is required for ACME}"
 : "${DESEC_TOKEN:?DESEC_TOKEN env is required for deSEC}"
@@ -21,19 +22,15 @@ LEGO_PATH="${LEGO_PATH:-/data/lego}"
 OUT_DIR="/opt/ssl"
 mkdir -p "$LEGO_PATH" "$OUT_DIR"
 
-# lock-файл, если LEGO_PATH может шариться (на будущее / k8s)
 LOCK_FILE="$LEGO_PATH/.acme.lock"
 mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
-flock -x 9
+flock -x 9 || true
 log "acquired global ACME lock: $LOCK_FILE"
 
 # --- Домены ---
 DOMAINS_FROM_ENV="${DOMAINS:-}"
 DOMAINS_FROM_FILE=""
-
-DOMAIN_DIR_FS="${DOMAIN_DIR:-/server_data}"
-DOMAIN_TXT_PATH="${DOMAIN_DIR_FS}/domain.txt"
 
 if [ -f "$DOMAIN_TXT_PATH" ]; then
   DOMAINS_FROM_FILE="$(tr -d ' \n\r' <"$DOMAIN_TXT_PATH")"
@@ -60,7 +57,7 @@ for d in $DOMAINS_FINAL; do
 done
 IFS="$OLD_IFS"
 
-# Первый домен — основной CN
+# Берём первый домен как основной CN
 first_domain="$(echo "$DOMAINS_FINAL" | cut -d',' -f1 | tr -d ' \n\r')"
 
 issue_cert() {
@@ -137,7 +134,7 @@ if ! copy_from_lego "$first_domain"; then
   exit 1
 fi
 
-# 2.3) Фоновое авто-продление
+# 2.3) Background auto-renew (без haproxy-части)
 (
   RENEW_INTERVAL="${RENEW_INTERVAL:-21600}"   # 6 часов
   while true; do
@@ -156,18 +153,14 @@ fi
   done
 ) &
 
-# ---------- Запуск Prometheus ----------
-log "[entrypoint] Starting Prometheus..."
-
-mkdir -p /etc/prometheus/data
-
+# ---------- 3) Запуск Prometheus ----------
+log "Starting Prometheus..."
 prometheus \
   --config.file=/configs/prometheus.yml \
   --storage.tsdb.path=/etc/prometheus/data \
   &
+log "Prometheus started in background"
 
-log "[entrypoint] Prometheus started in background."
-
-# ---------- Старт Redis (как основной процесс) ----------
-log "[entrypoint] Starting Redis..."
+# ---------- 4) Старт Redis (главный процесс) ----------
+log "Starting Redis..."
 exec /Redis/redis-server /Redis/redis.conf
