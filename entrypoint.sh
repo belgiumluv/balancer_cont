@@ -153,13 +153,6 @@ fi
   done
 ) &
 
-# ---------- 3) Запуск Prometheus ----------
-log "Starting Prometheus..."
-prometheus \
-  --config.file=/configs/prometheus.yml \
-  --storage.tsdb.path=/etc/prometheus/data \
-  &
-log "Prometheus started in background"
 
 # ---------- 4) Старт Redis (главный процесс) ----------
 log "Starting Redis..."
