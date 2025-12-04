@@ -74,12 +74,9 @@ COPY configs /configs
 COPY entrypoint.sh /entrypoint.sh
 
 # Права на бинарники и скрипты
-RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh /scripts/install_prometheus.sh
+RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh
 
-# ----- Установка Prometheus через скрипт -----
-ARG PROMETHEUS_VERSION=2.51.1
-ENV PROMETHEUS_VERSION=${PROMETHEUS_VERSION}
-RUN /scripts/install_prometheus.sh
+
 
 # ----- ENV -----
 ENV DOMAIN_DIR=/server_data
