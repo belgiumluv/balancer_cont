@@ -46,19 +46,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjemalloc2 \
  && rm -rf /var/lib/apt/lists/*
 
-# ----- Установка lego (как у тебя, только безопаснее) -----
+# ----- Установка lego -----
 ARG LEGO_VERSION=4.19.2
 RUN curl -L -o /tmp/lego.tar.gz "https://github.com/go-acme/lego/releases/download/v${LEGO_VERSION}/lego_v${LEGO_VERSION}_linux_amd64.tar.gz" \
  && tar -xzf /tmp/lego.tar.gz -C /usr/local/bin lego \
  && chmod +x /usr/local/bin/lego \
  && rm -f /tmp/lego.tar.gz
-
-# ----- Установка Prometheus -----
-ARG PROMETHEUS_VERSION=2.51.1
-RUN curl -L -o /tmp/prometheus.tar.gz "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" \
- && tar -xzf /tmp/prometheus.tar.gz -C /tmp \
- && mv /tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64/prometheus /usr/local/bin/prometheus \
- && rm -rf /tmp/prometheus.tar.gz /tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64
 
 # ----- Каталоги под данные и конфиги -----
 RUN mkdir -p \
@@ -79,7 +72,14 @@ COPY redis.conf /Redis/redis.conf
 COPY scripts /scripts
 COPY configs /configs
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh
+
+# Права на бинарники и скрипты
+RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh /scripts/install_prometheus.sh
+
+# ----- Установка Prometheus через скрипт -----
+ARG PROMETHEUS_VERSION=2.51.1
+ENV PROMETHEUS_VERSION=${PROMETHEUS_VERSION}
+RUN /scripts/install_prometheus.sh
 
 # ----- ENV -----
 ENV DOMAIN_DIR=/server_data
