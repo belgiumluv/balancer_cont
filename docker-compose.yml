@@ -1,11 +1,10 @@
+version: "3.8"
+
 services:
   app:
     build: .
-    container_name: redis-prometheus
+    container_name: redis-app
     restart: always
-    ports:
-      - "6379:6379"
-      - "9090:9090"
     environment:
       - EMAIL=zastawa777@gmail.com
       - DESEC_TOKEN=8GM6miDQkSC5TpsuFv8yXjVWd221
@@ -16,9 +15,34 @@ services:
       - ./server_data:/server_data
       - ./lego:/data/lego
       - ./ssl:/opt/ssl
-      - ./configs:/configs   # <- конфиг Prometheus с хоста в /configs
+      - ./configs:/configs    # если приложению тоже нужны configs
     ports:
       - "6379:6379"
-      - "9090:9090"
       - "8080:8080"
       - "9100:9100"
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    volumes:
+      # твой конфиг Prometheus на хосте → в контейнер
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # данные Prometheus
+      - ./prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
