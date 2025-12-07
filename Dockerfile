@@ -14,6 +14,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tar \
  && rm -rf /var/lib/apt/lists/*
 
+# каталог под balancer
+RUN mkdir -p /balancer
+
+# копируем бинарник внутрь образа
+COPY bin/balancer /bin/balancer
+RUN chmod +x /bin/balancer
+
+
 WORKDIR /build
 
 # Клонируем официальный Redis
