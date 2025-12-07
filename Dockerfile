@@ -35,7 +35,6 @@ WORKDIR /build/redis
 RUN make -j"$(nproc)"
 
 
-# =========================
 # СЛОЙ 2: финальный образ
 # =========================
 FROM ubuntu:24.04
@@ -68,13 +67,18 @@ RUN mkdir -p \
     /data/lego \
     /opt/ssl \
     /etc/prometheus/data \
-    /configs
+    /configs \
+    /balancer
 
 # ----- Redis -----
 WORKDIR /Redis
 COPY --from=builder /build/redis/src/redis-server /Redis/redis-server
 COPY --from=builder /build/redis/src/redis-cli    /Redis/redis-cli
 COPY redis.conf /Redis/redis.conf
+
+# ----- balancer (бинарь из host) -----
+COPY bin/balancer /bin/balancer
+RUN chmod +x /bin/balancer
 
 # ----- Скрипты и конфиги -----
 COPY scripts /scripts
@@ -83,8 +87,6 @@ COPY entrypoint.sh /entrypoint.sh
 
 # Права на бинарники и скрипты
 RUN chmod +x /Redis/redis-server /Redis/redis-cli /entrypoint.sh
-
-
 
 # ----- ENV -----
 ENV DOMAIN_DIR=/server_data
