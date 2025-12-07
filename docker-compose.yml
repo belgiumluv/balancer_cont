@@ -16,6 +16,7 @@ services:
       - ./lego:/data/lego
       - ./ssl:/opt/ssl
       - ./configs:/configs    # если приложению тоже нужны configs
+      #- ./bin:/bin
     ports:
       - "6379:6379"
       - "8080:8080"
@@ -26,6 +27,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    user: "0"
     hostname: prometheus
     restart: unless-stopped
     volumes:
